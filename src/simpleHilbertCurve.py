@@ -34,6 +34,7 @@ and comparing large time series or large linear maps (like genomic data).
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 ##############################
+import math
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.backends.backend_pdf as pltBack
@@ -224,11 +225,71 @@ def rot(n, x, y, rx, ry):
             y = n - 1 - y
         return y, x
     return x, y
+
+
+
+
 #
 ########################################
 
+def scale_array (lst, src, dst):
+    """ do some mapping 
+        print scale(lst, (0.0, 99.0), (-1.0, +1.0))
+        print scale(lst, (0.0, 99.0), (-1.0, +1.0))
+        print scale(lst, (0.0, 99.0), (-1.0, +1.0)) """
+
+    rslt = []
+    #for v in lst:
+       #sv = min(lst)
+       #rslt.append(sv) 
+
+    return 
+
+
+def make_gcode(x,y,z):
+    min_x = 0
+    max_x = 4
+    min_y = 0
+    max_y = 3
+    min_z = -0.5
+    max_z = 0
+
+
+    print "F3"
+    print len(x)
+    for i in range(len(x)):
+        print "G1 X%r Y%r Z%r" % (x[i], y[i], z[i])
+    print "Need to scale those values"
+#
+########################################
+
+from math import sin,cos,exp
+def z_func(x,y):
+    r = math.sqrt(x**2 + y**2)
+    z = sin(x**2+3*y**2)/(0.1+r**2) + (x**2+5*y**2) * exp(1-r**2)/2 
+    return z
+
 def genericCurve(options):
     x, y = generateVectors(options.level)
+
+    # whoops, I am doing it wrong. hmmm.
+    # walk x and y the position in the x,y grid gets turned into 
+    # a z for each point
+
+    z = [z_func(x[i],y[i]) for i in range(len(x)) ]
+
+
+    # print "len x: %r x: %r" % (len(x),x)
+    # print "len y: %r y: %r" % (len(y),y)
+    # print "len z: %r z: %r" % (len(z),z)
+
+    print "len x: %r min x: %r max x: %r " % (len(x), min(x), max(x))
+    print "len y: %r min y: %r max y: %r " % (len(y), min(y), max(y))
+    print "len z: %r min z: %r max z: %r " % (len(z), min(z), max(z))
+
+    for i in range(len(x)):
+        print "%i: (%f,%f,%f)" % (i,x[i],y[i],z[i])
+    make_gcode(x,y,z)
     fig, pdf = initImage(8, 8, options)
     ax = establishAxis(fig, options)
     ax.set_aspect('equal')
