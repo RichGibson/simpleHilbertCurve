@@ -43,10 +43,21 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy
 from optparse import OptionParser
+
 import os
 import sys
 
 colorMaps = [m for m in plt.cm.datad if not m.endswith("_r")]
+
+min_x = 0 # mm
+min_y = 0 # mm
+min_z = -18 # mm
+
+max_x = 50 # mm
+max_y = 50 # mm
+max_z = 0 # mm
+
+z_clear = 10 # mm, where we move z to do non-cutting moves
 
 def initOptions(parser):
     parser.add_option('-n', '--level', dest='level', default=6,
@@ -245,26 +256,94 @@ def scale_array (lst, src, dst):
 
     return 
 
+def translate(value, leftMin, leftMax, rightMin, rightMax):
+    # Figure out how 'wide' each range is
+    leftSpan = leftMax - leftMin
+    rightSpan = rightMax - rightMin
 
-def make_gcode(x,y,z):
-    min_x = 0
-    max_x = 4
-    min_y = 0
-    max_y = 3
-    min_z = -0.5
-    max_z = 0
+    # Convert the left range into a 0-1 range (float)
+    valueScaled = float(value - leftMin) / float(leftSpan)
+
+    # Convert the 0-1 range into a value in the right range.
+    return rightMin + (valueScaled * rightSpan)
+
+def make_gcode(x,y):
+    """ calculate/get or lookup a z value, and then make a gcode representation"""
+
+    # defined at top
+    #min_x = 0 # mm
+    #min_y = 0 # mm
+    #min_z = -18 # mm
+
+    #max_x = 50 # mm
+    #max_y = 50 # mm
+    #max_z = 0 # mm
+
+    #z_clear = 10 # mm, where we move z to do non-cutting moves
+
+    # generate z, lots of options in what Z could be. From a simple constant depth,
+    # to an interesting 'base' function
+
+    # z = [z_func(x[i],y[i]) for i in range(len(x)) ]
+    zinc = (max_z - min_z)/ len(x)
+    #z = sin(x**2+3*y**2)/(0.1+r**2) + (x**2+5*y**2) * exp(1-r**2)/2 
+
+    z = [zinc*i for i in range(len(x))]
+
+    print "(SimpleHilbertCurve by Dent Earl, GCode extension by Rich Gibson)"
+    print "(Original Code: https://github.com/dentearl/simpleHilbertCurve)"
+    print "(Gcode Fork: https://github.com/RichGibson/simpleHilbertCurve )"
+    print "(Called with these options)"
+    print "(%r)" % sys.argv
+    print "(Prescaled Values in 'Hilbert Space')"
+    print "(len x: %r min x: %r max x: %r) " % (len(x), min(x), max(x))
+    print "(len y: %r min y: %r max y: %r) " % (len(y), min(y), max(y))
+    print "(len z: %r min z: %r max z: %r) " % (len(z), min(z), max(z))
+    print ""
+    print "(Scaling to machine coordinates-in mm)"
+    print "(X %r,%r Y %r,%r Z %r,%r)" % (min_x,max_y,min_y,max_y,min_z,max_z)
+
+    
+
+    #print "(Screen coordinate x,y,z values)"
+    #for i in range(len(x)):
+        #print "%i: (%f,%f,%f)" % (i,x[i],y[i],z[i])
+
+    #translate(value, leftMin, leftMax, rightMin, rightMax):
+    x = [ translate(i, min(x),max(x),min_x, max_x) for i in x]
+    y = [ translate(i, min(y),max(y),min_y, max_y) for i in y]
+    z = [ translate(i, min(z),max(z),min_z, max_z) for i in z]
+
+    
+    #print "(Gcode coordinate x,y,z values)"
+    #for i in range(len(x)):
+        #print "%i: %f,%f,%f" % (i,x[i],y[i],z[i])
 
 
-    print "F3"
-    print len(x)
+    print "G17 G21 G40 G49  (XY Plane, mm mode, cancel diameter comp, cancel length offset)"
+    print "G90 (non-incremental motion)"
+    print "F200 (feed rate)"
+    print "(Total line segments %r)" % len(x)
+
     for i in range(len(x)):
-        print "G1 X%r Y%r Z%r" % (x[i], y[i], z[i])
-    print "Need to scale those values"
+        if i==0:
+            # going to first position
+            print "G0 Z%f" % (z_clear)
+            print "G0 X%r Y%r " % (x[i], y[i])
+            print "G0 Z%f" % (max_z)
+            print "G1 X%r Y%r Z%r" % (x[i], y[i], z[i])
+        else:
+            print "G1 X%r Y%r Z%r" % (x[i], y[i], z[i])
+
+    print "G0 Z%f" % (z_clear)
+    print "G0 X0 Y0"
+    print "M2 (end program)"
 #
 ########################################
 
 from math import sin,cos,exp
 def z_func(x,y):
+    
     r = math.sqrt(x**2 + y**2)
     z = sin(x**2+3*y**2)/(0.1+r**2) + (x**2+5*y**2) * exp(1-r**2)/2 
     return z
@@ -272,24 +351,7 @@ def z_func(x,y):
 def genericCurve(options):
     x, y = generateVectors(options.level)
 
-    # whoops, I am doing it wrong. hmmm.
-    # walk x and y the position in the x,y grid gets turned into 
-    # a z for each point
-
-    z = [z_func(x[i],y[i]) for i in range(len(x)) ]
-
-
-    # print "len x: %r x: %r" % (len(x),x)
-    # print "len y: %r y: %r" % (len(y),y)
-    # print "len z: %r z: %r" % (len(z),z)
-
-    print "len x: %r min x: %r max x: %r " % (len(x), min(x), max(x))
-    print "len y: %r min y: %r max y: %r " % (len(y), min(y), max(y))
-    print "len z: %r min z: %r max z: %r " % (len(z), min(z), max(z))
-
-    for i in range(len(x)):
-        print "%i: (%f,%f,%f)" % (i,x[i],y[i],z[i])
-    make_gcode(x,y,z)
+    make_gcode(x,y)
     fig, pdf = initImage(8, 8, options)
     ax = establishAxis(fig, options)
     ax.set_aspect('equal')
