@@ -48,16 +48,15 @@ import os
 import sys
 
 colorMaps = [m for m in plt.cm.datad if not m.endswith("_r")]
+min_x = 0
+min_y = 0 
+min_z = 0 
+max_x = 4 
+max_y = 4
+max_z = .75 
+z_depth=0
+z_clear=15
 
-min_x = 0 # mm
-min_y = 0 # mm
-min_z = -18 # mm
-
-max_x = 50 # mm
-max_y = 50 # mm
-max_z = 0 # mm
-
-z_clear = 10 # mm, where we move z to do non-cutting moves
 
 def initOptions(parser):
     parser.add_option('-n', '--level', dest='level', default=6,
@@ -93,6 +92,23 @@ def initOptions(parser):
                       type='int',
                       help='dots per inch of raster outputs, i.e. if --outFormat is all '
                       'or png. default=%default')
+
+
+    # g_code parameters. 
+    # todo: probably should add option for whether or not to generate the gcode.
+    # todo: also something about z...
+    parser.add_option('--min_x', dest='min_x', default=0, type='int', help='for gcode minimum x, in mm')
+    parser.add_option('--max_x', dest='max_x', default=50, type='int', help='for gcode maximum x, in mm')
+    parser.add_option('--min_y', dest='min_y', default=0, type='int', help='for gcode minimum y, in mm')
+    parser.add_option('--max_y', dest='max_y', default=50, type='int', help='for gcode maximum y, in mm')
+    parser.add_option('--min_z', dest='min_z', default=0, type='int', help='for gcode minimum z, in mm')
+    parser.add_option('--max_z', dest='max_z', default=50, type='int', help='for gcode maximum z, in mm')
+    parser.add_option('--z_depth', dest='z_depth', default=z_depth, type='int', help='for gcode depth of gcode cut (see code'
+                      'for hints on adding a function to generate z based in interesting ways. This is in mm. If not set '
+                      'Z will start at max_z and slowly go down to min_z during the course of the tool path')
+    parser.add_option('--z_clear', dest='z_clear', default=10, type='int', help='for gcode, clearance in Z for moving without cutting.'
+                      'maximum z, in mm')
+
     parser.add_option('--outFormat', dest='outFormat', default='pdf',
                       type='string',
                       help='output format [pdf|png|eps|all]. default=%default')
@@ -100,6 +116,9 @@ def initOptions(parser):
                       type='string',
                       help=('path/filename where figure will be created. No '
                             'extension needed. default=%default'))
+
+
+
 
 def checkOptions(options, args, parser):
     options.max = 0
@@ -123,6 +142,14 @@ def checkOptions(options, args, parser):
     if (options.out.endswith('.png') or options.out.endswith('.pdf') or 
         options.out.endswith('.eps')):
         options.out = options.out[:-4]
+    min_x = options.min_x 
+    min_y = options.min_y 
+    min_z = options.min_z 
+    max_x = options.max_x 
+    max_y = options.max_y 
+    max_z = options.max_z 
+    z_depth=options.z_depth
+
 
 def initImage(width, height, options):
     """
@@ -270,25 +297,24 @@ def translate(value, leftMin, leftMax, rightMin, rightMax):
 def make_gcode(x,y):
     """ calculate/get or lookup a z value, and then make a gcode representation"""
 
-    # defined at top
-    #min_x = 0 # mm
-    #min_y = 0 # mm
-    #min_z = -18 # mm
-
-    #max_x = 50 # mm
-    #max_y = 50 # mm
-    #max_z = 0 # mm
-
-    #z_clear = 10 # mm, where we move z to do non-cutting moves
-
+ 
     # generate z, lots of options in what Z could be. From a simple constant depth,
     # to an interesting 'base' function
 
     # z = [z_func(x[i],y[i]) for i in range(len(x)) ]
-    zinc = (max_z - min_z)/ len(x)
-    #z = sin(x**2+3*y**2)/(0.1+r**2) + (x**2+5*y**2) * exp(1-r**2)/2 
 
-    z = [zinc*i for i in range(len(x))]
+    # these two lines will cause z to ramp down. In theory one could cut a hilbert
+    # curve and then have a marble roll down the whole thing, illustrating the 
+    # continuous nature of the line. In practice the material I have been cutting
+    # is a little too mess for that :-/
+    if not z_depth:
+        zinc = (max_z - min_z)/ len(x)
+        z = [zinc*i for i in range(len(x))]
+
+    
+
+    
+
 
     print "(SimpleHilbertCurve by Dent Earl, GCode extension by Rich Gibson)"
     print "(Original Code: https://github.com/dentearl/simpleHilbertCurve)"
